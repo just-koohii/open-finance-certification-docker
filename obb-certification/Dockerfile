@@ -2,7 +2,7 @@ FROM maven:3.8.3-openjdk-17 AS builder
 
 WORKDIR /usr/src/obb-certification
 
-RUN git clone https://gitlab.com/obb1/certification.git .
+RUN git clone https://gitlab.com/raidiam-conformance/open-finance/certification.git .
 
 RUN mvn -q -B -DskipTests=true clean package
 
@@ -18,7 +18,8 @@ COPY --from=builder /usr/src/obb-certification/target/fapi-test-suite.jar       
 COPY ./suite-caller.sh                                              suite-caller.sh
 
 RUN chmod u+x suite-caller.sh
-ENV BASE_URL=https://localhost.emobix.co.uk:8443
+ENV ENABLE_HTTPD=true
+ENV BASE_URL=https://certification.inic-of.com:8443
 ENV DIRECTORYROOTS_URL=https://data.sandbox.directory.openbankingbrasil.org.br/roots_directory.jwks
 ENV DIRECTORY_PARTICIPANTS_URL=https://data.sandbox.directory.openbankingbrasil.org.br/participants
 
@@ -28,10 +29,11 @@ COPY ./httpd-server.conf /etc/httpd/conf.d/
 
 RUN rm -f /etc/httpd/conf.d/ssl.conf
 
-RUN mkdir -p /etc/ssl/certs /etc/ssl/private \
-    && openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-        -keyout /etc/ssl/private/ssl-cert-snakeoil.key \
-        -out /etc/ssl/certs/ssl-cert-snakeoil.pem \
-        -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
+RUN mkdir -p /etc/ssl/certification
 
-CMD httpd -D BACKGROUND && ./suite-caller.sh
+COPY ./certification.pem /etc/ssl/certification/certification.pem
+COPY ./certification.key /etc/ssl/certification/certification.key
+
+# CMD httpd -D BACKGROUND && ./suite-caller.sh
+
+CMD if [ "$ENABLE_HTTPD" = "true" ]; then httpd -D BACKGROUND; fi && ./suite-caller.sh
